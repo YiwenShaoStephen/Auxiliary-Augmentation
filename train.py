@@ -6,6 +6,7 @@ import random
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.backends.cudnn as cudnn
 import torch.optim
 import torch.optim.lr_scheduler as lr_scheduler
 import torch.utils.data
@@ -58,8 +59,8 @@ parser.add_argument('--rotation-prob', default=0.25, type=float,
                     help="Probabiity of doing rotation")
 parser.add_argument('--rotation-range', default=360, type=float,
                     help="Range of possible rotation degree, defualt is full range(360)")
-parser.add_argument('--factor', default=0.5, type=float,
-                    help="factor of loss function from rotated images")
+parser.add_argument('--alpha', default=0.5, type=float,
+                    help="factor of loss from rotated images")
 parser.set_defaults(augment=True)
 
 
@@ -99,7 +100,7 @@ def main():
         batch_size=args.batch_size, shuffle=False, **kwargs)
 
     # create model
-    model = get_model(args.arch, args.dataset, args.num_aux_classes)
+    model = get_model(args.arch, args.dataset, args.num_rotate_classes)
     model = model.cuda()
 
     # get the number of model parameters
@@ -124,6 +125,8 @@ def main():
                   .format(args.resume, checkpoint['epoch']))
         else:
             print("=> no checkpoint found at '{}'".format(args.resume))
+
+    cudnn.benchmark = True
 
     # define learning rate scheduler
     if not args.milestones:
@@ -178,9 +181,6 @@ def train(train_loader, model, criterion, optimizer, epoch):
             input = input.cuda()
             target_aux = target_aux.cuda(async=True)
             cls, aux = model(input)
-            # adding the loss together
-            loss = (args.factor * criterion(cls, target) +
-                    criterion(aux, target_aux))
 
             loss_cls = criterion(cls, target)
             loss_aux = criterion(aux, target_aux)
@@ -191,12 +191,12 @@ def train(train_loader, model, criterion, optimizer, epoch):
             prec_cls = accuracy(cls.data, target, topk=(1,))[0]
             prec_aux = accuracy(aux.data, target_aux, topk=(1,))[0]
 
-            losses_cls.update(loss_cls.data[0], input.size(0))
-            losses_aux.update(loss_aux.data[0], input.size(0))
-            losses.update(loss.data[0], input.size(0))
+            losses_cls.update(loss_cls.item(), input.size(0))
+            losses_aux.update(loss_aux.item(), input.size(0))
+            losses.update(loss.item(), input.size(0))
 
-            top1_cls.update(prec_cls[0], input.size(0))
-            top1_aux.update(prec_aux[0], input.size(0))
+            top1_cls.update(prec_cls, input.size(0))
+            top1_aux.update(prec_aux, input.size(0))
             # compute gradient and do SGD step
             optimizer.zero_grad()
             loss.backward()
@@ -216,20 +216,20 @@ def train(train_loader, model, criterion, optimizer, epoch):
                       'Auxiliary: {top1_aux.val:.3f} ({top1_aux.avg:.3f})'.format(
                           epoch, i, len(train_loader), batch_time=batch_time,
                           loss=losses, loss_cls=losses_cls, loss_aux=losses_aux,
-                          top1_aux=top1_aux, top1_aux=top1_aux))
+                          top1_cls=top1_cls, top1_aux=top1_aux))
         else:
             target = target.cuda(async=True)
             input = input.cuda()
             cls, _ = model(input)
             # normal output layer
-            loss = criterion(cls, target)
+            loss_cls = criterion(cls, target)
             # measure accuracy and record loss
             prec1 = accuracy(cls.data, target, topk=(1,))[0]
-            losses.update(loss.data[0], input.size(0))
-            top1_cls.update(prec1[0], input.size(0))
+            losses_cls.update(loss_cls.item(), input.size(0))
+            top1_cls.update(prec1, input.size(0))
             # compute gradient and do SGD step
             optimizer.zero_grad()
-            loss.backward()
+            loss_cls.backward()
             optimizer.step()
 
             # measure elapsed time
@@ -239,13 +239,15 @@ def train(train_loader, model, criterion, optimizer, epoch):
             if i % args.print_freq == 0:
                 print('Epoch: [{0}][{1}/{2}]\t'
                       'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Loss_cls {loss_cls.val:.4f} ({loss_cls.avg:.4f})\t'
                       'Prec@1 Classification: {top1_cls.val:.3f} ({top1_cls.avg:.3f})'.format(
                           epoch, i, len(train_loader), batch_time=batch_time,
-                          loss=losses, top1_cls=top1_cls))
+                          loss_cls=losses_cls, top1_cls=top1_cls))
 
     # log to TensorBoard
     if args.tensorboard:
+        lr = optimizer.param_groups[0]['lr']
+        log_value('learning_rate', lr, epoch)
         log_value('train_loss', losses.avg, epoch)
         log_value('train_loss_cls', losses_cls.avg, epoch)
         log_value('train_acc', top1_cls.avg, epoch)
@@ -270,13 +272,13 @@ def validate(val_loader, model, criterion, epoch):
 
             # compute output
             # only the normal output is used in validation
-            output = model(input_var)[0]
-            loss = criterion(output, target_var)
+            output, _ = model(input)
+            loss = criterion(output, target)
 
             # measure accuracy and record loss
             prec1 = accuracy(output.data, target, topk=(1,))[0]
-            losses.update(loss.data[0], input.size(0))
-            top1.update(prec1[0], input.size(0))
+            losses.update(loss.item(), input.size(0))
+            top1.update(prec1, input.size(0))
 
             # measure elapsed time
             batch_time.update(time.time() - end)

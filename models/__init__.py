@@ -1,8 +1,8 @@
-from pyramidnet import *
-from densenet import *
-from resnet import *
-from wideresnet import *
-from resnext import *
+from .pyramidnet import *
+from .densenet import *
+from .resnet import *
+from .wideresnet import *
+from .resnext import *
 
 
 def get_model(arch, dataset, num_aux_classes):

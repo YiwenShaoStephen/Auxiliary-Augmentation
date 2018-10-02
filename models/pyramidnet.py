@@ -113,11 +113,11 @@ class PyramidNet(nn.Module):
         super(PyramidNet, self).__init__()
         self.inplanes = 16
 
-        if bottleneck == True:
-            n = (depth - 2) / 9
+        if bottleneck:
+            n = (depth - 2) // 9
             block = Bottleneck
         else:
-            n = (depth - 2) / 6
+            n = (depth - 2) // 6
             block = BasicBlock
 
         self.addrate = alpha / (3 * n * 1.0)
@@ -190,11 +190,11 @@ class PyramidAuxNet(nn.Module):
         super(PyramidAuxNet, self).__init__()
         self.inplanes = 16
 
-        if bottleneck == True:
-            n = (depth - 2) / 9
+        if bottleneck:
+            n = (depth - 2) // 9
             block = Bottleneck
         else:
-            n = (depth - 2) / 6
+            n = (depth - 2) // 6
             block = BasicBlock
 
         self.addrate = alpha / (3 * n * 1.0)

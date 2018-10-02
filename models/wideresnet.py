@@ -55,7 +55,7 @@ class WideResNet(nn.Module):
         nChannels = [16, 16 * widen_factor,
                      32 * widen_factor, 64 * widen_factor]
         assert((depth - 4) % 6 == 0)
-        n = (depth - 4) / 6
+        n = (depth - 4) // 6
         block = BasicBlock
         # 1st conv before any network block
         self.conv1 = nn.Conv2d(num_colors, nChannels[0], kernel_size=3, stride=1,
@@ -103,7 +103,7 @@ class WideResNetAux(nn.Module):
         nChannels = [16, 16 * widen_factor,
                      32 * widen_factor, 64 * widen_factor]
         assert((depth - 4) % 6 == 0)
-        n = (depth - 4) / 6
+        n = (depth - 4) // 6
         block = BasicBlock
         # 1st conv before any network block
         self.conv1 = nn.Conv2d(num_colors, nChannels[0], kernel_size=3, stride=1,

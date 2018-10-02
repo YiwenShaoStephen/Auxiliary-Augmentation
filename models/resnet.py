@@ -86,9 +86,9 @@ class ResNet(nn.Module):
         super(ResNet, self).__init__()
         self.inplanes = 16
 
-        n = (depth - 2) / 6
-        if bottleneck == True:
-            n = n * 2 / 3
+        n = (depth - 2) // 6
+        if bottleneck:
+            n = n * 2 // 3
             block = Bottleneck
         else:
             block = BasicBlock
@@ -151,9 +151,9 @@ class ResNetAux(nn.Module):
         super(ResNetAux, self).__init__()
         self.inplanes = 16
 
-        n = (depth - 2) / 6
-        if bottleneck == True:
-            n = n * 2 / 3
+        n = (depth - 2) // 6
+        if bottleneck is True:
+            n = n * 2 // 3
             block = Bottleneck
         else:
             block = BasicBlock
